@@ -1,0 +1,58 @@
+<div id="gemini-chat-container">
+    <div id="chat-bubble" onclick="toggleChat()">💬</div>
+    <div id="chat-window" style="display: none;">
+        <div id="chat-header">Company Assistant</div>
+        <div id="chat-messages"></div>
+        <div id="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Ask a question..." onkeypress="handleKey(event)">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+</div>
+<style>
+    #gemini-chat-container { position: fixed; bottom: 20px; right: 20px; font-family: -apple-system, sans-serif; z-index: 9999; }
+    #chat-bubble { width: 60px; height: 60px; background: #007bff; color: white; border-radius: 50%; text-align: center; line-height: 60px; font-size: 28px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    #chat-window { width: 340px; height: 480px; background: white; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden; position: absolute; bottom: 75px; right: 0; border: 1px solid #eaeaea; }
+    #chat-header { background: #007bff; color: white; padding: 15px; font-weight: bold; }
+    #chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
+    .msg { padding: 10px 14px; border-radius: 14px; max-width: 80%; }
+    .user { background: #007bff; color: white; align-self: flex-end; }
+    .bot { background: #f1f1f1; color: #333; align-self: flex-start; }
+    #chat-input-area { display: flex; border-top: 1px solid #eee; padding: 10px; }
+    #chat-input { flex: 1; border: 1px solid #ddd; padding: 10px; border-radius: 6px; outline: none; }
+    #chat-input-area button { background: #007bff; color: white; border: none; padding: 0 16px; margin-left: 8px; border-radius: 6px; cursor: pointer; }
+</style>
+<script>
+    const API_URL = 'http://localhost:5000'; 
+    function toggleChat() {
+        const windowDiv = document.getElementById('chat-window');
+        windowDiv.style.display = windowDiv.style.display === 'none' ? 'flex' : 'none';
+    }
+    function handleKey(e) { if (e.key === 'Enter') sendMessage(); }
+    async function sendMessage() {
+        const input = document.getElementById('chat-input');
+        const text = input.value.trim();
+        if (!text) return;
+        appendMessage(text, 'user');
+        input.value = '';
+        try {
+            const res = await fetch(`${API_URL}/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text })
+            });
+            const data = await res.json();
+            appendMessage(data.reply || data.error, 'bot');
+        } catch (err) {
+            appendMessage("Unable to connect to assistant.", 'bot');
+        }
+    }
+    function appendMessage(text, sender) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `msg ${sender}`;
+        msgDiv.innerText = text;
+        const container = document.getElementById('chat-messages');
+        container.appendChild(msgDiv);
+        container.scrollTop = container.scrollHeight;
+    }
+</script>
