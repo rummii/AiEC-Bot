@@ -1,167 +1,261 @@
 import os
+import re
+import uuid
 import requests
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
-from google import genai
-from google.genai import types
 from werkzeug.utils import secure_filename
+from datetime import datetime
+import speech_recognition as sr
+from pydub import AudioSegment
 
-app = Flask(__name__)
+# Explicit local configuration import
+try:
+    import config
+    TELEGRAM_BOT_TOKEN = getattr(config, "TELEGRAM_BOT_TOKEN", None)
+    TELEGRAM_CHAT_ID = getattr(config, "TELEGRAM_CHAT_ID", None)
+    DEEPSEEK_API_KEY = getattr(config, "DEEPSEEK_API_KEY", None)
+except ImportError:
+    TELEGRAM_BOT_TOKEN = None
+    TELEGRAM_CHAT_ID = None
+    DEEPSEEK_API_KEY = None
+
+app = Flask(__name__, template_folder='templates')
 CORS(app)
 
-# Persistent paths for cloud compatibility
-UPLOAD_FOLDER = '/tmp/knowledge_base' if os.environ.get('RENDER') else 'knowledge_base'
+UPLOAD_FOLDER = 'knowledge_base'
 KB_FILE = os.path.join(UPLOAD_FOLDER, 'company_data.txt')
 AUDIO_FOLDER = os.path.join(UPLOAD_FOLDER, 'audio_logs')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
-# Credentials configuration from environment variables
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "8624026555:AAHzsOh95QmuqhoPOYuVhcfkOeIfJG87P54")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "6027602817")
+LEADS_DATABASE = []
 
-# Initialize Gemini Client
-client = genai.Client()
-
-VCARD_DATA = """BEGIN:VCARD
-VERSION:3.0
-N:Jet;;;;
-FN:Jet
-ORG:Monitor Gear
-TITLE:Creative Director
-TEL;TYPE=CELL,VOICE:+639000000000
-EMAIL;TYPE=PREF,INTERNET:jet@monitorgear.com
-NOTE:Connected via Gemini Sales Agent
-END:VCARD"""
-
-def send_telegram_alert(device_info):
-    """Fires an instant notification to your phone via Telegram."""
-    if not TELEGRAM_TOKEN:
-        return
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    message = (
-        "🚨 **Lead QR Code Scanned!**\n\n"
-        f"📱 Device: {device_info}\n"
-        "⚡ *Action Required:* Open your voice recorder or prepare to dictate your interaction summary."
-    )
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
+def send_telegram_alert(message, lead_name=None):
+    """Dispatches a real-time notification payload to the external Telegram anchor."""
+    if not TELEGRAM_BOT_TOKEN or "YOUR_ACTUAL" in TELEGRAM_BOT_TOKEN:
+        print("--> Telegram Alert Skipped: Valid credentials not found in config.py")
+        return False
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message,
+        "parse_mode": "Markdown"
+    }
     try:
-        requests.post(url, json=payload, timeout=5)
+        response = requests.post(url, json=payload, timeout=5)
+        return response.status_code == 200
     except Exception as e:
-        print(f"[Error] Failed to send Telegram notification: {e}")
+        print(f"--> Telegram Transport Error: {e}")
+        return False
 
-def get_knowledge_base():
-    if os.path.exists(KB_FILE):
-        with open(KB_FILE, 'r', encoding='utf-8') as f:
-            return f.read()
-    return "No company information available yet."
+def parse_vcard(vcard_text):
+    name, company, email = "Unknown", "Unknown", "Unknown"
+    fn_match = re.search(r'FN:(.*)', vcard_text, re.IGNORECASE)
+    if fn_match: name = fn_match.group(1).strip()
+    org_match = re.search(r'ORG:(.*)', vcard_text, re.IGNORECASE)
+    if org_match: company = org_match.group(1).strip()
+    email_match = re.search(r'EMAIL.*:(.*)', vcard_text, re.IGNORECASE)
+    if email_match: email = email_match.group(1).strip()
+    return name, company, email
 
-@app.route('/connect', methods=['GET'])
-def lead_scanned_qr():
-    user_agent = request.headers.get("User-Agent", "Unknown Device")
-    send_telegram_alert(user_agent)
-    return Response(
-        VCARD_DATA,
-        mimetype="text/vcard",
-        headers={"Content-Disposition": "attachment; filename=jet_contact.vcf"}
-    )
+@app.route('/', methods=['GET'])
+def index_dashboard():
+    return render_template('index.html')
 
-# --- NEW: Audio Ingestion Pipeline Route ---
+@app.route('/scan', methods=['POST'])
+@app.route('/intake-qr', methods=['POST'])
+def intake_qr():
+    data = request.json or {}
+    qr_payload = data.get('qr_payload') or data.get('data', '')
+    if "BEGIN:VCARD" in qr_payload:
+        name, company, email = parse_vcard(qr_payload)
+    else:
+        name, company, email = "Scanned Text QR", "Unknown", qr_payload[:40]
+
+    lead_entry = {
+        "timestamp": datetime.now().strftime("%I:%M %p"),
+        "name": name,
+        "company": company,
+        "email": email,
+        "source": "QR Scanner",
+        "audio_note": ""
+    }
+    LEADS_DATABASE.append(lead_entry)
+    
+    msg = f"🔔 *New QR Lead Intercepted!*\n👤 *Name:* {name}\n🏢 *Company:* {company}\n📧 *Email:* {email}"
+    send_telegram_alert(msg)
+    
+    return jsonify({"status": "success", "all_leads": LEADS_DATABASE})
+
+@app.route('/manual_save', methods=['POST'])
+def intake_manual():
+    data = request.json or {}
+    lead_entry = {
+        "timestamp": datetime.now().strftime("%I:%M %p"),
+        "name": data.get('name', 'Unknown'),
+        "company": data.get('company', 'Unknown'),
+        "email": data.get('email', 'Unknown'),
+        "source": "Manual Input",
+        "audio_note": ""
+    }
+    LEADS_DATABASE.append(lead_entry)
+    
+    msg = f"✍️ *Manual Lead Override Logged*\n👤 *Name:* {lead_entry['name']}\n🏢 *Company:* {lead_entry['company']}\n📧 *Email:* {lead_entry['email']}"
+    send_telegram_alert(msg)
+    
+    return jsonify({"status": "success", "all_leads": LEADS_DATABASE})
+
 @app.route('/ingest-audio', methods=['POST'])
 def ingest_audio():
-    """
-    Receives a raw meeting voice note, transcribes and extracts lead data via Gemini,
-    and appends the structured results straight to your knowledge database.
-    """
     if 'file' not in request.files:
-        return jsonify({'error': 'No audio file found in request'}), 400
-        
+        return jsonify({'error': 'No audio file found'}), 400
     file = request.files['file']
     if file.filename == '':
-        return jsonify({'error': 'Empty file submission'}), 400
-
+        return jsonify({'error': 'Empty file name'}), 400
+        
+    anchor_raw = request.form.get('anchor_index', None)
     filename = secure_filename(file.filename)
     saved_path = os.path.join(AUDIO_FOLDER, filename)
     file.save(saved_path)
-    
-    # Format a highly structural parsing blueprint for Gemini Flash
-    parsing_prompt = (
-        "You are an expert sales intelligence assistant parsing a raw conference meeting voice recording.\n"
-        "Analyze the uploaded audio track and extract all explicit business lead items.\n\n"
-        "Format your output exactly using this layout:\n"
-        "--- LEAD PROFILE METADATA ---\n"
-        "• Name: [Lead Name or Unknown]\n"
-        "• Company: [Company Name or Unknown]\n"
-        "• Contact Points: [Email/Phone discussed]\n"
-        "• Immediate Pain Point/Interest: [Core topic discussed]\n"
-        "• Assigned Action Items: [Follow-up task details]\n"
-    )
 
     try:
-        # Upload the saved audio directly into Gemini's multi-modal processing queue
-        print(f"📦 Uploading voice session tracking file: {filename}")
-        audio_media = client.files.upload(file=saved_path)
-        
-        # Run inference against the media track using gemini-2.5-flash
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=[audio_media, parsing_prompt]
-        )
-        
-        extracted_profile = response.text
-        
-        # Permanently write this structured target right into your file system database
-        with open(KB_FILE, 'a', encoding='utf-8') as f:
-            f.write(f"\n\n=== NEW LEAD PROFILE ATTACHED ===\n{extracted_profile}")
+        wav_path = os.path.join(AUDIO_FOLDER, "converted.wav")
+        try:
+            audio = AudioSegment.from_file(saved_path)
+        except Exception:
+            ext = os.path.splitext(filename)[1].replace('.', '').lower() or 'm4a'
+            audio = AudioSegment.from_file(saved_path, format=ext)
             
-        return jsonify({
-            'message': 'Audio analyzed and structural target committed.',
-            'profile_extracted': extracted_profile
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        audio.export(wav_path, format="wav")
 
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-    if file:
-        filename = secure_filename(file.filename)
-        content = file.read().decode('utf-8', errors='ignore')
+        recognizer = sr.Recognizer()
+        with sr.AudioFile(wav_path) as source:
+            audio_data = recognizer.record(source)
+            try:
+                spoken_text = recognizer.recognize_google(audio_data)
+            except Exception:
+                spoken_text = "[Speech parsed but raw text unclear]"
+
+        if os.path.exists(wav_path): os.remove(wav_path)
+        if os.path.exists(saved_path): os.remove(saved_path)
+
+        target_name = "Global Unlinked Record"
+        if anchor_raw is not None and str(anchor_raw).strip() != "":
+            try:
+                idx = int(str(anchor_raw).strip())
+                if 0 <= idx < len(LEADS_DATABASE):
+                    existing = LEADS_DATABASE[idx].get('audio_note', '')
+                    if existing:
+                        LEADS_DATABASE[idx]['audio_note'] = f"{existing} | {spoken_text}"
+                    else:
+                        LEADS_DATABASE[idx]['audio_note'] = spoken_text
+                    target_name = f"{LEADS_DATABASE[idx]['name']} ({LEADS_DATABASE[idx]['company']})"
+                    
+                    msg = f"🎙️ *Voice Note Bound to Context*\n👤 *Target:* {LEADS_DATABASE[idx]['name']}\n📋 *Insight:* \"_{spoken_text}_\""
+                    send_telegram_alert(msg)
+            except ValueError:
+                pass
+
         with open(KB_FILE, 'a', encoding='utf-8') as f:
-            f.write(f"\n\n--- Document: {filename} ---\n{content}")
-        return jsonify({'message': f'Successfully added {filename} to knowledge base.'})
-
-@app.route('/chat', methods=['POST'])
-def chat():
-    data = request.json or {}
-    user_message = data.get('message', '')
-    context = get_knowledge_base()
-    
-    system_instruction = (
-        "You are a helpful, direct, and authentic company AI assistant.\n"
-        "Your job is ONLY to answer questions using the company context provided below.\n"
-        "If the answer cannot be found in the context, politely reply: "
-        "'I am sorry, but I can only answer questions related to the company using my current knowledge base.'\n"
-        f"--- COMPANY CONTEXT ---\n{context}"
-    )
-    
-    try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=user_message,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                temperature=0.2
-            )
-        )
-        return jsonify({'reply': response.text})
+            f.write(f"\n\n=== RECORD PROFILE BIND: {target_name.upper()} ===\n• Timestamp: {datetime.now().strftime('%Y-%m-%d %I:%M %p')}\n• Transcript: {spoken_text}")
+            
+        return jsonify({'message': 'Success', 'all_leads': LEADS_DATABASE, 'parsed': spoken_text})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        if os.path.exists(saved_path): os.remove(wav_path)
+        return jsonify({'error': f"Pipeline crash: {str(e)}"}), 500
+
+def download_telegram_file(file_id):
+    if not TELEGRAM_BOT_TOKEN or "YOUR_ACTUAL" in TELEGRAM_BOT_TOKEN:
+        raise ValueError("Telegram bot token not configured")
+
+    file_res = requests.get(
+        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getFile?file_id={file_id}",
+        timeout=15
+    ).json()
+
+    if not file_res.get("ok"):
+        raise ValueError(f"Telegram getFile failed: {file_res}")
+
+    file_path = file_res["result"]["file_path"]
+    audio_url = f"https://api.telegram.org/file/bot{TELEGRAM_BOT_TOKEN}/{file_path}"
+
+    filename = secure_filename(os.path.basename(file_path))
+    if not filename:
+        filename = f"telegram_voice_{uuid.uuid4().hex}.ogg"
+
+    saved_path = os.path.join(AUDIO_FOLDER, filename)
+    with requests.get(audio_url, stream=True, timeout=20) as response:
+        response.raise_for_status()
+        with open(saved_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+
+    return saved_path
+
+
+def transcribe_audio_file(file_path):
+    wav_path = os.path.join(AUDIO_FOLDER, f"telegram_{uuid.uuid4().hex}.wav")
+    try:
+        audio = AudioSegment.from_file(file_path)
+        audio.export(wav_path, format="wav")
+
+        recognizer = sr.Recognizer()
+        with sr.AudioFile(wav_path) as source:
+            audio_data = recognizer.record(source)
+            try:
+                return recognizer.recognize_google(audio_data)
+            except Exception:
+                return "[Speech parsed but raw text unclear]"
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        if os.path.exists(wav_path):
+            os.remove(wav_path)
+
+
+@app.route('/webhook', methods=['POST'])
+def handle_webhook():
+    data = request.get_json(force=True, silent=True) or {}
+    if data and "message" in data and "voice" in data["message"]:
+        file_id = data["message"]["voice"]["file_id"]
+
+        try:
+            saved_path = download_telegram_file(file_id)
+            transcription = transcribe_audio_file(saved_path)
+        except Exception as exc:
+            return jsonify({"status": "failed", "error": str(exc)}), 500
+
+        if LEADS_DATABASE:
+            existing = LEADS_DATABASE[-1].get("audio_note", "")
+            if existing:
+                LEADS_DATABASE[-1]["audio_note"] = f"{existing} | {transcription}"
+            else:
+                LEADS_DATABASE[-1]["audio_note"] = transcription
+
+            msg = (
+                f"🎙️ *Telegram Voice Note Bound to Context*\n"
+                f"👤 *Target:* {LEADS_DATABASE[-1]['name']}\n"
+                f"📋 *Summary:* _{transcription}_"
+            )
+            send_telegram_alert(msg)
+
+        with open(KB_FILE, 'a', encoding='utf-8') as f:
+            f.write(
+                f"\n\n=== TELEGRAM VOICE RECORD ===\n"
+                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %I:%M %p')}\n"
+                f"• Transcript: {transcription}\n"
+            )
+
+        return jsonify({"status": "synced", "transcription": transcription, "all_leads": LEADS_DATABASE}), 200
+
+    return jsonify({"status": "ignored"}), 200
+
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    import sys
+    if len(sys.argv) > 2 and sys.argv[1] == 'transcribe':
+        print(transcribe_audio_file(sys.argv[2]))
+    else:
+        app.run(host='0.0.0.0', port=5000)

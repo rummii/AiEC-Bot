@@ -1,0 +1,17 @@
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local development / environment
+.vscode/
+config.py
+
+# Generated / runtime data
+knowledge_base/audio_logs/
+last_summary.txt
+test_recording.wav
+
+# Nested repository directories
+company-chatbot/

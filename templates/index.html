@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AiEC-Bot Executive Hub</title>
+    <style>
+        :root {
+            --primary: #1e6091;
+            --primary-hover: #1a5280;
+            --bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-main: #212529;
+            --text-muted: #6c757d;
+            --border-color: #e9ecef;
+            --success: #2ec4b6;
+            --warning: #ff9f1c;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        
+        body { 
+            background: var(--bg); 
+            color: var(--text-main); 
+            padding: 20px;
+            font-size: 14px;
+            -webkit-text-size-adjust: 100%;
+        }
+        
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 900px;
+            margin: 0 auto 20px auto;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .header-bar h2 { font-size: 18px; font-weight: 600; color: #111; }
+        .status-badge { font-size: 11px; color: var(--success); font-weight: bold; text-transform: uppercase; }
+
+        .status-alert {
+            max-width: 900px;
+            margin: 0 auto 15px auto;
+            padding: 12px;
+            background: #e2f0fd;
+            border-left: 4px solid var(--primary);
+            color: #0d3b66;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .status-alert.error { background: #ffe3e3; border-left-color: #e63946; color: #811818; }
+        .status-alert.success { background: #e8f7f5; border-left-color: var(--success); color: #135048; }
+        
+        .main-container {
+            max-width: 900px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #333;
+        }
+
+        label { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 5px; }
+        
+        input[type="text"], input[type="email"], input[type="file"] {
+            width: 100%;
+            background: #f1f3f5;
+            border: 1px solid transparent;
+            color: var(--text-main);
+            padding: 12px;
+            margin-bottom: 12px;
+            outline: none;
+            font-size: 14px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        input:focus { background: #fff; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(30,96,145,0.1); }
+        
+        button {
+            background: var(--primary);
+            border: none;
+            color: white;
+            padding: 14px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            width: 100%;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+        button:hover { background: var(--primary-hover); }
+        button:active { transform: scale(0.99); }
+        
+        .video-box {
+            width: 100%;
+            background: #0f172a;
+            border-radius: 6px;
+            aspect-ratio: 16/9;
+            object-fit: cover;
+            margin-bottom: 12px;
+        }
+        .video-placeholder {
+            width: 100%;
+            background: #1e293b;
+            color: #94a3b8;
+            height: 180px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 13px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            border: 1px dashed #334155;
+        }
+
+        .anchor-box {
+            font-size: 12px;
+            color: #664d03;
+            background-color: #fff3cd;
+            border: 1px solid #ffe69c;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            font-weight: 500;
+        }
+        
+        .table-wrap { overflow-x: auto; margin-top: 5px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { padding: 12px 10px; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { background: #f1f3f5; color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+        
+        tr.lead-row { cursor: pointer; transition: background 0.15s; }
+        tr.lead-row:hover { background: #f8f9fa; }
+        tr.active-anchor { background: #e2f0fd !important; }
+        tr.active-anchor td { color: var(--primary); font-weight: 500; }
+
+        .audio-badge {
+            font-size: 11px;
+            background: #fff3cd;
+            color: #664d03;
+            padding: 3px 6px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 4px;
+            font-weight: normal;
+        }
+    </style>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+
+    <div class="header-bar">
+        <h2>AiEC-Bot <span style="font-weight: 400; font-size: 13px; background: #e9ecef; padding: 2px 8px; border-radius: 12px; margin-left: 5px; color: var(--primary);">Executive Hub</span></h2>
+        <div class="status-badge">● Workspace Active</div>
+    </div>
+
+    <div id="status-banner" class="status-alert">System Ready. Awaiting QR code initialization or manual lead override.</div>
+
+    <div class="main-container">
+        
+        <div class="card">
+            <div class="card-title">📷 Scan Client QR Code</div>
+            <video id="preview-video" class="video-box" autoplay playsinline style="display:none;"></video>
+            <div id="reader" class="video-box" style="display:none;"></div>
+            <div id="cam-fallback" class="video-placeholder">
+                <span style="font-size: 24px; margin-bottom: 5px;">📷</span>
+                <span>Camera Stream Inactive</span>
+            </div>
+            <button id="btn-camera">Activate QR Scanner</button>
+        </div>
+
+        <div class="card">
+            <div class="card-title">✍️ Manual Lead Override</div>
+            <form id="manual-form" onsubmit="event.preventDefault();">
+                <label>Lead Name</label>
+                <input type="text" id="manual-name" placeholder="John Doe" autocomplete="off">
+                
+                <label>Company</label>
+                <input type="text" id="manual-company" placeholder="Hyper AI" autocomplete="off">
+                
+                <label>Email Address</label>
+                <input type="email" id="manual-email" placeholder="john@example.com" autocomplete="off">
+                
+                <button id="btn-save" type="button">Commit Record to Registry</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <div class="card-title">🎙️ Interaction Voice Logger</div>
+            <div id="anchor-status" class="anchor-box">
+                ⚠️ No active interaction context chosen. Tap a row in the matrix registry below to attach voice metadata.
+            </div>
+            <label>Upload Audio Interaction (.m4a, .mp3, .wav)</label>
+            <input type="file" id="audio-file" accept="audio/*, .m4a, .mp4, .mov, .3gp, .mp3, .wav">
+            <button id="btn-audio">Ingest Speech Metrics</button>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📊 Active Record Matrix</div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Identity / Profile</th>
+                            <th>Company</th>
+                            <th>Email Address</th>
+                            <th>Origin</th>
+                        </tr>
+                    </thead>
+                    <tbody id="database-body">
+                        <tr>
+                            <td colspan="5" style="color: var(--text-muted); text-align: center; padding: 20px;">[Registry empty — standby for target logging]</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const banner = document.getElementById('status-banner');
+        let selectedLeadIndex = null;
+        let localLeadsCache = [];
+
+        function setStatus(msg, type = 'info') {
+            banner.textContent = msg;
+            banner.className = 'status-alert';
+            if (type === 'error') banner.classList.add('error');
+            if (type === 'success') banner.classList.add('success');
+        }
+
+        function updateTable(leads) {
+            const tbody = document.getElementById('database-body');
+            if (!leads || leads.length === 0) return;
+            localLeadsCache = leads;
+            tbody.innerHTML = '';
+            
+            leads.forEach((lead, index) => {
+                const tr = document.createElement('tr');
+                tr.className = "lead-row";
+                
+                if (selectedLeadIndex === index) {
+                    tr.classList.add('active-anchor');
+                }
+                
+                const audioBadge = lead.audio_note ? `<div class="audio-badge">🎙️ Notes: ${lead.audio_note}</div>` : '';
+                
+                tr.innerHTML = `
+                    <td>${lead.timestamp || '--'}</td>
+                    <td>
+                        <div style="font-weight: 600; color: inherit;">${lead.name || '--'}</div>
+                        ${audioBadge}
+                    </td>
+                    <td>${lead.company || '--'}</td>
+                    <td>${lead.email || '--'}</td>
+                    <td style="color: var(--text-muted); font-size: 11px; font-weight: bold;">[${(lead.source || 'MANUAL').toUpperCase()}]</td>
+                `;
+                
+                tr.onclick = function() {
+                    selectAnchor(index);
+                };
+                
+                tbody.appendChild(tr);
+            });
+        }
+
+        function selectAnchor(index) {
+            if (!localLeadsCache || localLeadsCache.length === 0 || !localLeadsCache[index]) {
+                selectedLeadIndex = null;
+                return;
+            }
+            
+            selectedLeadIndex = index;
+            const target = localLeadsCache[index];
+            const statusBox = document.getElementById('anchor-status');
+            
+            statusBox.style.backgroundColor = "#e2f0fd";
+            statusBox.style.borderColor = "#bbeeec";
+            statusBox.style.color = "var(--primary)";
+            statusBox.textContent = `🎯 Context Locked onto Profile: ${target.name.toUpperCase()} (${target.company.toUpperCase()})`;
+            
+            updateTable(localLeadsCache);
+            setStatus(`Context tracking redirected to: ${target.name.toUpperCase()}`, 'success');
+        }
+
+        async function startCamera() {
+            if (!window.Html5Qrcode) {
+                setStatus('QR decoder library unavailable: HTML5 QR Code component failed to load.', 'error');
+                return;
+            }
+
+            const reader = document.getElementById('reader');
+            const fallback = document.getElementById('cam-fallback');
+            const preview = document.getElementById('preview-video');
+
+            try {
+                preview.style.display = 'none';
+                reader.style.display = 'block';
+                fallback.style.display = 'none';
+                setStatus('Camera sensor framework online. Scanning for QR payload...', 'success');
+
+                const html5QrCode = new Html5Qrcode('reader');
+                await html5QrCode.start(
+                    { facingMode: 'environment' },
+                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                    decodedText => {
+                        html5QrCode.stop()
+                            .then(() => {
+                                setStatus('QR Code read completed successfully!', 'success');
+                                processQRData(decodedText);
+                            })
+                            .catch(stopErr => setStatus(`Scanner stop error: ${stopErr}`, 'error'));
+                    },
+                    errorMessage => {
+                        // QR polling callback; ignore transient errors.
+                    }
+                );
+            } catch (err) {
+                preview.style.display = 'none';
+                reader.style.display = 'none';
+                fallback.style.display = 'block';
+                setStatus(`Hardware activation failure: ${err.message || err}`, 'error');
+            }
+        }
+
+        function processQRData(data) {
+            fetch('/intake-qr', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ qr_payload: data })
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (result.error) {
+                    setStatus(`Scanner save failure: ${result.error}`, 'error');
+                } else {
+                    setStatus(`Scanned contact logged: ${result.name || 'Profile Appended'}`, 'success');
+                    if (result.all_leads) {
+                        updateTable(result.all_leads);
+                    }
+                }
+            })
+            .catch(err => {
+                setStatus(`Network error while saving QR scan: ${err.message}`, 'error');
+            });
+        }
+
+        async function saveLead() {
+            const name = document.getElementById('manual-name').value.trim();
+            const company = document.getElementById('manual-company').value.trim();
+            const email = document.getElementById('manual-email').value.trim();
+
+            if (!name) {
+                setStatus('Validation Error: Lead Name identity parameter is required.', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/manual_save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, company, email })
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    setStatus('Record successfully written to operational datalog archive.', 'success');
+                    updateTable(result.all_leads);
+                    document.getElementById('manual-form').reset();
+                    
+                    // Auto-anchor to newly added manual items safely
+                    selectAnchor(result.all_leads.length - 1);
+                } else {
+                    setStatus(`Database commit failure: ${result.error}`, 'error');
+                }
+            } catch (err) {
+                setStatus(`Network transport exception: ${err.message}`, 'error');
+            }
+        }
+
+        async function processAudio() {
+            const fileInput = document.getElementById('audio-file');
+            if (fileInput.files.length === 0) {
+                setStatus('Input Exception: Provide an audio conversation asset container to parse.', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            if (selectedLeadIndex !== null && selectedLeadIndex !== undefined) {
+                formData.append('anchor_index', String(selectedLeadIndex));
+            }
+            
+            setStatus('Parsing conversation audio container via cognitive pipeline tools...');
+
+            try {
+                const response = await fetch('/ingest-audio', { method: 'POST', body: formData });
+                const result = await response.json();
+                if (response.ok) {
+                    setStatus('Conversation waveform parsed and bound to lead profile asset.', 'success');
+                    if (result.all_leads) {
+                        localLeadsCache = result.all_leads;
+                        updateTable(localLeadsCache);
+                        
+                        // Re-verify safe anchor sync without resetting view arrays
+                        if (selectedLeadIndex !== null && localLeadsCache[selectedLeadIndex]) {
+                            const currentTarget = localLeadsCache[selectedLeadIndex];
+                            document.getElementById('anchor-status').textContent = `🎯 Context Locked onto Profile: ${currentTarget.name.toUpperCase()} (${currentTarget.company.toUpperCase()})`;
+                        }
+                    }
+                } else {
+                    setStatus(`Parsing engine failure: ${result.error}`, 'error');
+                }
+            } catch (err) {
+                setStatus(`Pipeline timeout exception: ${err.message}`, 'error');
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById('btn-camera').addEventListener('click', startCamera);
+            document.getElementById('btn-save').addEventListener('click', saveLead);
+            document.getElementById('btn-audio').addEventListener('click', processAudio);
+        });
+    </script>
+</body>
+</html>

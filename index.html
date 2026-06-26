@@ -1,58 +1,248 @@
-<div id="gemini-chat-container">
-    <div id="chat-bubble" onclick="toggleChat()">💬</div>
-    <div id="chat-window" style="display: none;">
-        <div id="chat-header">Company Assistant</div>
-        <div id="chat-messages"></div>
-        <div id="chat-input-area">
-            <input type="text" id="chat-input" placeholder="Ask a question..." onkeypress="handleKey(event)">
-            <button onclick="sendMessage()">Send</button>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AiEC-Bot Control Panel</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        :root {
+            --bg-color: #f4f6f9;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --primary: #007bff;
+            --success: #28a745;
+            --error: #dc3545;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 15px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+        @media(min-width: 600px) {
+            .grid { grid-template-columns: 1fr 1fr; }
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        button {
+            width: 100%;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:active { opacity: 0.9; }
+        #reader {
+            width: 100%;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .status-banner {
+            padding: 12px;
+            border-radius: 6px;
+            display: none;
+            margin-bottom: 15px;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        .status-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        pre {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+            white-space: pre-wrap;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🗃️ AiEC-Bot Executive Hub</h2>
+
+    <div id="statusBanner" class="status-banner"></div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="card-title">📷 Scan Client QR Code</div>
+            <div id="reader"></div>
+            <button onclick="startScanner()">Activate Scanner Camera</button>
+        </div>
+
+        <div class="card">
+            <div class="card-title">✍️ Manual Lead Override</div>
+            <form id="manualLeadForm" onsubmit="submitManualLead(event)">
+                <div style="margin-bottom: 12px;">
+                    <label>Lead Name</label>
+                    <input type="text" id="leadName" placeholder="John Doe" required>
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <label>Company</label>
+                    <input type="text" id="leadCompany" placeholder="WMall Muntinlupa" required>
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <label>Email Address</label>
+                    <input type="email" id="leadEmail" placeholder="client@domain.com" required>
+                </div>
+                <button type="submit" style="background-color: #6c757d;">Save Verified Contact</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">🎙️ Audio Parsing Framework</div>
+        <input type="file" id="audioFile" accept=".m4a,.mp3,.wav">
+        <button onclick="uploadAudioLog()">Process Spoken Audio Insight</button>
+        
+        <div id="outputZone" style="margin-top: 15px; display: none;">
+            <label>Extracted Sales Intelligence Output:</label>
+            <pre id="extractedOutput"></pre>
         </div>
     </div>
 </div>
-<style>
-    #gemini-chat-container { position: fixed; bottom: 20px; right: 20px; font-family: -apple-system, sans-serif; z-index: 9999; }
-    #chat-bubble { width: 60px; height: 60px; background: #007bff; color: white; border-radius: 50%; text-align: center; line-height: 60px; font-size: 28px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-    #chat-window { width: 340px; height: 480px; background: white; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden; position: absolute; bottom: 75px; right: 0; border: 1px solid #eaeaea; }
-    #chat-header { background: #007bff; color: white; padding: 15px; font-weight: bold; }
-    #chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
-    .msg { padding: 10px 14px; border-radius: 14px; max-width: 80%; }
-    .user { background: #007bff; color: white; align-self: flex-end; }
-    .bot { background: #f1f1f1; color: #333; align-self: flex-start; }
-    #chat-input-area { display: flex; border-top: 1px solid #eee; padding: 10px; }
-    #chat-input { flex: 1; border: 1px solid #ddd; padding: 10px; border-radius: 6px; outline: none; }
-    #chat-input-area button { background: #007bff; color: white; border: none; padding: 0 16px; margin-left: 8px; border-radius: 6px; cursor: pointer; }
-</style>
+
 <script>
-    const API_URL = 'http://localhost:5000'; 
-    function toggleChat() {
-        const windowDiv = document.getElementById('chat-window');
-        windowDiv.style.display = windowDiv.style.display === 'none' ? 'flex' : 'none';
+    const banner = document.getElementById('statusBanner');
+
+    function showStatus(msg, isSuccess) {
+        banner.style.display = 'block';
+        banner.className = `status-banner ${isSuccess ? 'status-success' : 'status-error'}`;
+        banner.innerText = isSuccess ? `✅ ${msg}` : `❌ ${msg}`;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-    function handleKey(e) { if (e.key === 'Enter') sendMessage(); }
-    async function sendMessage() {
-        const input = document.getElementById('chat-input');
-        const text = input.value.trim();
-        if (!text) return;
-        appendMessage(text, 'user');
-        input.value = '';
-        try {
-            const res = await fetch(`${API_URL}/chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text })
-            });
-            const data = await res.json();
-            appendMessage(data.reply || data.error, 'bot');
-        } catch (err) {
-            appendMessage("Unable to connect to assistant.", 'bot');
+
+    // QR Code Scanning Engine
+    function startScanner() {
+        const html5QrcodeScanner = new Html5Qrcode("reader");
+        html5QrcodeScanner.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            (decodedText) => {
+                html5QrcodeScanner.stop().then(() => {
+                    showStatus("QR Code read completed successfully!", true);
+                    processQRData(decodedText);
+                });
+            },
+            (errorMessage) => { /* Silent check loop */ }
+        ).catch(err => showStatus("Camera initialization failed: " + err, false));
+    }
+
+    function processQRData(data) {
+        // Post data string back to flask intake matching endpoint
+        fetch('/intake-qr', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ qr_payload: data })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.error) showStatus(data.error, false);
+            else showStatus(`Scanned contact logged: ${data.name || 'Profile Appended'}`, true);
+        })
+        .catch(err => showStatus("Error logging scanned context: " + err, false));
+    }
+
+    // Manual Lead Processing Override
+    function submitManualLead(e) {
+        e.preventDefault();
+        const payload = {
+            name: document.getElementById('leadName').value,
+            company: document.getElementById('leadCompany').value,
+            email: document.getElementById('leadEmail').value
+        };
+
+        fetch('/intake-manual', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.error) showStatus(data.error, false);
+            else {
+                showStatus("Contact profile verified and locked into database!", true);
+                document.getElementById('manualLeadForm').reset();
+            }
+        })
+        .catch(err => showStatus("Submission error: " + err, false));
+    }
+
+    // Audio Dispatch Parsing Framework
+    function uploadAudioLog() {
+        const fileInput = document.getElementById('audioFile');
+        if (!fileInput.files[0]) {
+            showStatus("Please pick an .m4a voice log item first.", false);
+            return;
         }
-    }
-    function appendMessage(text, sender) {
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `msg ${sender}`;
-        msgDiv.innerText = text;
-        const container = document.getElementById('chat-messages');
-        container.appendChild(msgDiv);
-        container.scrollTop = container.scrollHeight;
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        showStatus("Processing multi-modal speech transcription layer...", true);
+
+        fetch('/ingest-audio', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) showStatus(data.error, false);
+            else {
+                showStatus("Audio log compiled and saved to local architecture database!", true);
+                document.getElementById('outputZone').style.display = 'block';
+                document.getElementById('extractedOutput').innerText = data.profile_extracted;
+            }
+        })
+        .catch(err => showStatus("Network endpoint timeout or dropped frame: " + err, false));
     }
 </script>
+</body>
+</html>
