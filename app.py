@@ -218,11 +218,12 @@ def ingest_audio():
         return jsonify({'error': f"Pipeline crash: {str(e)}"}), 500
 
 def download_telegram_file(file_id):
-    if not TELEGRAM_BOT_TOKEN or "YOUR_ACTUAL" in TELEGRAM_BOT_TOKEN:
+    token = _normalize_setting_value(TELEGRAM_BOT_TOKEN)
+    if is_placeholder_setting(token):
         raise ValueError("Telegram bot token not configured")
 
     file_res = requests.get(
-        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getFile?file_id={file_id}",
+        f"https://api.telegram.org/bot{token}/getFile?file_id={file_id}",
         timeout=15
     ).json()
 
@@ -230,7 +231,7 @@ def download_telegram_file(file_id):
         raise ValueError(f"Telegram getFile failed: {file_res}")
 
     file_path = file_res["result"]["file_path"]
-    audio_url = f"https://api.telegram.org/file/bot{TELEGRAM_BOT_TOKEN}/{file_path}"
+    audio_url = f"https://api.telegram.org/file/bot{token}/{file_path}"
 
     filename = secure_filename(os.path.basename(file_path))
     if not filename:
@@ -270,39 +271,49 @@ def transcribe_audio_file(file_path):
 @app.route('/webhook', methods=['POST'])
 def handle_webhook():
     data = request.get_json(force=True, silent=True) or {}
-    if data and "message" in data and "voice" in data["message"]:
-        file_id = data["message"]["voice"]["file_id"]
+    if not data or "message" not in data:
+        return jsonify({"status": "ignored", "reason": "no message"}), 200
 
-        try:
-            saved_path = download_telegram_file(file_id)
-            transcription = transcribe_audio_file(saved_path)
-        except Exception as exc:
-            return jsonify({"status": "failed", "error": str(exc)}), 500
+    message = data.get("message", {})
+    if "voice" not in message:
+        return jsonify({"status": "ignored", "reason": "no voice"}), 200
 
-        if LEADS_DATABASE:
-            existing = LEADS_DATABASE[-1].get("audio_note", "")
-            if existing:
-                LEADS_DATABASE[-1]["audio_note"] = f"{existing} | {transcription}"
-            else:
-                LEADS_DATABASE[-1]["audio_note"] = transcription
+    file_id = message.get("voice", {}).get("file_id")
+    if not file_id:
+        return jsonify({"status": "ignored", "reason": "missing file_id"}), 200
 
-            msg = (
-                f"🎙️ *Telegram Voice Note Bound to Context*\n"
-                f"👤 *Target:* {LEADS_DATABASE[-1]['name']}\n"
-                f"📋 *Summary:* _{transcription}_"
-            )
-            send_telegram_alert(msg)
+    try:
+        saved_path = download_telegram_file(file_id)
+        transcription = transcribe_audio_file(saved_path)
+    except ValueError as exc:
+        logger.warning(f"[TELEGRAM WEBHOOK] Configuration error: {exc}")
+        return jsonify({"status": "failed", "error": str(exc)}), 503
+    except Exception as exc:
+        logger.exception("[TELEGRAM WEBHOOK] Unexpected processing error")
+        return jsonify({"status": "failed", "error": str(exc)}), 500
 
-        with open(KB_FILE, 'a', encoding='utf-8') as f:
-            f.write(
-                f"\n\n=== TELEGRAM VOICE RECORD ===\n"
-                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %I:%M %p')}\n"
-                f"• Transcript: {transcription}\n"
-            )
+    if LEADS_DATABASE:
+        existing = LEADS_DATABASE[-1].get("audio_note", "")
+        if existing:
+            LEADS_DATABASE[-1]["audio_note"] = f"{existing} | {transcription}"
+        else:
+            LEADS_DATABASE[-1]["audio_note"] = transcription
 
-        return jsonify({"status": "synced", "transcription": transcription, "all_leads": LEADS_DATABASE}), 200
+        msg = (
+            f"🎙️ *Telegram Voice Note Bound to Context*\n"
+            f"👤 *Target:* {LEADS_DATABASE[-1]['name']}\n"
+            f"📋 *Summary:* _{transcription}_"
+        )
+        send_telegram_alert(msg)
 
-    return jsonify({"status": "ignored"}), 200
+    with open(KB_FILE, 'a', encoding='utf-8') as f:
+        f.write(
+            f"\n\n=== TELEGRAM VOICE RECORD ===\n"
+            f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %I:%M %p')}\n"
+            f"• Transcript: {transcription}\n"
+        )
+
+    return jsonify({"status": "synced", "transcription": transcription, "all_leads": LEADS_DATABASE}), 200
 
 
 if __name__ == '__main__':
