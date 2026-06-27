@@ -43,7 +43,7 @@ LEADS_DATABASE = []
 def send_telegram_alert(message, lead_name=None):
     """Dispatches a real-time notification payload to the external Telegram anchor."""
     if not TELEGRAM_BOT_TOKEN or "YOUR_ACTUAL" in TELEGRAM_BOT_TOKEN:
-        print("--> Telegram Alert Skipped: Valid credentials not found in config.py")
+        print("--> Telegram Alert Skipped: missing TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID in Render environment or config.py")
         return False
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
