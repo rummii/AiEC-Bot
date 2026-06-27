@@ -8,6 +8,7 @@ from werkzeug.utils import secure_filename
 from datetime import datetime
 import speech_recognition as sr
 from pydub import AudioSegment
+import logging
 
 # Explicit local configuration import
 try:
@@ -15,14 +16,47 @@ try:
 except ImportError:
     config = None
 
+# Set up Flask logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+def _normalize_setting_value(value):
+    if value is None:
+        return None
+
+    normalized = str(value).strip()
+    if len(normalized) >= 2 and normalized[0] == normalized[-1] and normalized[0] in {'"', "'"}:
+        normalized = normalized[1:-1].strip()
+
+    return normalized or None
+
 
 def get_setting(name, default=None):
-    value = os.environ.get(name)
-    if value is not None and str(value).strip() != "":
+    value = _normalize_setting_value(os.environ.get(name))
+    if value is not None:
         return value
+
     if config is not None:
-        return getattr(config, name, default)
+        return _normalize_setting_value(getattr(config, name, default)) or default
+
     return default
+
+
+def is_placeholder_setting(value):
+    if value is None:
+        return True
+
+    cleaned = str(value).strip().lower()
+    placeholder_markers = (
+        "your_actual",
+        "your_telegram_bot_token_here",
+        "your_telegram_chat_id_here",
+        "your_bot_token_here",
+        "your_chat_id_here",
+        "your_deepseek_key_here",
+    )
+    return not cleaned or any(marker in cleaned for marker in placeholder_markers)
 
 
 TELEGRAM_BOT_TOKEN = get_setting("TELEGRAM_BOT_TOKEN")
@@ -42,20 +76,29 @@ LEADS_DATABASE = []
 
 def send_telegram_alert(message, lead_name=None):
     """Dispatches a real-time notification payload to the external Telegram anchor."""
-    if not TELEGRAM_BOT_TOKEN or "YOUR_ACTUAL" in TELEGRAM_BOT_TOKEN:
+    token = _normalize_setting_value(TELEGRAM_BOT_TOKEN)
+    chat_id = _normalize_setting_value(TELEGRAM_CHAT_ID)
+
+    if is_placeholder_setting(token) or is_placeholder_setting(chat_id):
+        print("--> Telegram Alert Skipped: Valid credentials not found in config.py")
         print("--> Telegram Alert Skipped: missing TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID in Render environment or config.py")
+        logger.warning("[TELEGRAM] Skipped because the bot token or chat ID is missing or still a placeholder.")
         return False
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+
+    logger.info(f"[TELEGRAM] Attempting to send alert: {message[:50]}...")
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
+        "chat_id": chat_id,
         "text": message,
         "parse_mode": "Markdown"
     }
     try:
         response = requests.post(url, json=payload, timeout=5)
+        status = "✅ SUCCESS" if response.status_code == 200 else f"❌ FAILED ({response.status_code})"
+        logger.info(f"[TELEGRAM] {status}: {response.text[:100]}")
         return response.status_code == 200
     except Exception as e:
-        print(f"--> Telegram Transport Error: {e}")
+        logger.error(f"[TELEGRAM] ❌ Transport Error: {e}")
         return False
 
 def parse_vcard(vcard_text):
