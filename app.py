@@ -62,6 +62,7 @@ def is_placeholder_setting(value):
 TELEGRAM_BOT_TOKEN = get_setting("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = get_setting("TELEGRAM_CHAT_ID")
 DEEPSEEK_API_KEY = get_setting("DEEPSEEK_API_KEY")
+TELEGRAM_WEBHOOK_URL = get_setting("TELEGRAM_WEBHOOK_URL") or get_setting("PUBLIC_WEBHOOK_URL") or get_setting("WEBHOOK_PUBLIC_URL") or get_setting("TUNNEL_URL")
 
 app = Flask(__name__, template_folder='templates')
 CORS(app)
@@ -99,6 +100,43 @@ def send_telegram_alert(message, lead_name=None):
         return response.status_code == 200
     except Exception as e:
         logger.error(f"[TELEGRAM] ❌ Transport Error: {e}")
+        return False
+
+
+def _normalize_webhook_url(base_url):
+    base_url = _normalize_setting_value(base_url)
+    if not base_url:
+        return None
+
+    if base_url.endswith("/webhook"):
+        return base_url
+
+    return f"{base_url.rstrip('/')}/webhook"
+
+
+def register_telegram_webhook():
+    token = _normalize_setting_value(TELEGRAM_BOT_TOKEN)
+    webhook_url = _normalize_webhook_url(TELEGRAM_WEBHOOK_URL)
+
+    if is_placeholder_setting(token) or is_placeholder_setting(webhook_url):
+        logger.info("[TELEGRAM] Webhook registration skipped: missing token or webhook URL.")
+        return False
+
+    try:
+        response = requests.post(
+            f"https://api.telegram.org/bot{token}/setWebhook",
+            json={"url": webhook_url, "drop_pending_updates": False},
+            timeout=10,
+        )
+        result = response.json()
+        if response.status_code == 200 and result.get("ok"):
+            logger.info(f"[TELEGRAM] Webhook registered: {webhook_url}")
+            return True
+
+        logger.warning(f"[TELEGRAM] Webhook registration failed: {result}")
+        return False
+    except Exception as exc:
+        logger.warning(f"[TELEGRAM] Webhook registration error: {exc}")
         return False
 
 def parse_vcard(vcard_text):
@@ -266,6 +304,9 @@ def transcribe_audio_file(file_path):
             os.remove(file_path)
         if os.path.exists(wav_path):
             os.remove(wav_path)
+
+
+register_telegram_webhook()
 
 
 @app.route('/webhook', methods=['POST'])
