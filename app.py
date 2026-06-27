@@ -12,18 +12,27 @@ from pydub import AudioSegment
 # Explicit local configuration import
 try:
     import config
-    TELEGRAM_BOT_TOKEN = getattr(config, "TELEGRAM_BOT_TOKEN", None)
-    TELEGRAM_CHAT_ID = getattr(config, "TELEGRAM_CHAT_ID", None)
-    DEEPSEEK_API_KEY = getattr(config, "DEEPSEEK_API_KEY", None)
 except ImportError:
-    TELEGRAM_BOT_TOKEN = None
-    TELEGRAM_CHAT_ID = None
-    DEEPSEEK_API_KEY = None
+    config = None
+
+
+def get_setting(name, default=None):
+    value = os.environ.get(name)
+    if value is not None and str(value).strip() != "":
+        return value
+    if config is not None:
+        return getattr(config, name, default)
+    return default
+
+
+TELEGRAM_BOT_TOKEN = get_setting("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = get_setting("TELEGRAM_CHAT_ID")
+DEEPSEEK_API_KEY = get_setting("DEEPSEEK_API_KEY")
 
 app = Flask(__name__, template_folder='templates')
 CORS(app)
 
-UPLOAD_FOLDER = 'knowledge_base'
+UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", "knowledge_base")
 KB_FILE = os.path.join(UPLOAD_FOLDER, 'company_data.txt')
 AUDIO_FOLDER = os.path.join(UPLOAD_FOLDER, 'audio_logs')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -258,4 +267,4 @@ if __name__ == '__main__':
     if len(sys.argv) > 2 and sys.argv[1] == 'transcribe':
         print(transcribe_audio_file(sys.argv[2]))
     else:
-        app.run(host='0.0.0.0', port=5000)
+        app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
