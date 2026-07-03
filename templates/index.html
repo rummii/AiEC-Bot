@@ -387,9 +387,6 @@
                     setStatus('Record successfully written to operational datalog archive.', 'success');
                     updateTable(result.all_leads);
                     document.getElementById('manual-form').reset();
-                    
-                    // Auto-anchor to newly added manual items safely
-                    selectAnchor(result.all_leads.length - 1);
                 } else {
                     setStatus(`Database commit failure: ${result.error}`, 'error');
                 }
@@ -422,12 +419,11 @@
                     if (result.all_leads) {
                         localLeadsCache = result.all_leads;
                         updateTable(localLeadsCache);
-                        
-                        // Re-verify safe anchor sync without resetting view arrays
-                        if (selectedLeadIndex !== null && localLeadsCache[selectedLeadIndex]) {
-                            const currentTarget = localLeadsCache[selectedLeadIndex];
-                            document.getElementById('anchor-status').textContent = `🎯 Context Locked onto Profile: ${currentTarget.name.toUpperCase()} (${currentTarget.company.toUpperCase()})`;
-                        }
+
+                        // Clear anchor after each parse to avoid accidental repeated writes.
+                        selectedLeadIndex = null;
+                        document.getElementById('anchor-status').textContent = '⚠️ No active interaction context chosen. Tap a row in the matrix registry below to attach voice metadata.';
+                        updateTable(localLeadsCache);
                     }
                 } else {
                     setStatus(`Parsing engine failure: ${result.error}`, 'error');

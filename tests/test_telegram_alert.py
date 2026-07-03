@@ -7,6 +7,18 @@ import app
 
 
 class TelegramAlertTests(unittest.TestCase):
+    def setUp(self):
+        self._original_leads = list(app.LEADS_DATABASE)
+        self._original_sender_map = dict(app.TELEGRAM_SENDER_TO_LEAD)
+        app.LEADS_DATABASE.clear()
+        app.TELEGRAM_SENDER_TO_LEAD.clear()
+
+    def tearDown(self):
+        app.LEADS_DATABASE.clear()
+        app.LEADS_DATABASE.extend(self._original_leads)
+        app.TELEGRAM_SENDER_TO_LEAD.clear()
+        app.TELEGRAM_SENDER_TO_LEAD.update(self._original_sender_map)
+
     def test_send_telegram_alert_skips_without_credentials(self):
         with patch.object(app, "TELEGRAM_BOT_TOKEN", None), \
              patch.object(app, "TELEGRAM_CHAT_ID", None), \
@@ -37,6 +49,80 @@ class TelegramAlertTests(unittest.TestCase):
         mock_post.assert_called_once()
         self.assertIn("/setWebhook", mock_post.call_args.args[0])
         self.assertEqual(mock_post.call_args.kwargs["json"]["url"], "https://example-tunnel.ngrok-free.app/webhook")
+
+    def test_find_best_lead_index_matches_contact_name(self):
+        app.LEADS_DATABASE.extend([
+            {"name": "Alice Carter", "company": "Northwind", "email": "alice@northwind.com", "audio_note": ""},
+            {"name": "Bob Smith", "company": "Acme Labs", "email": "bob@acme.com", "audio_note": ""},
+        ])
+
+        idx = app._find_best_lead_index("voice recap from bob smith about contract")
+        self.assertEqual(idx, 1)
+
+    def test_webhook_auto_attaches_to_matched_row(self):
+        app.LEADS_DATABASE.extend([
+            {"name": "Alice Carter", "company": "Northwind", "email": "alice@northwind.com", "audio_note": ""},
+            {"name": "Bob Smith", "company": "Acme Labs", "email": "bob@acme.com", "audio_note": ""},
+        ])
+
+        payload = {
+            "message": {
+                "voice": {"file_id": "abc123"},
+                "from": {"id": 42, "first_name": "Ops", "username": "opsuser"}
+            }
+        }
+
+        with app.app.test_client() as client, \
+             patch("app.download_telegram_file", return_value="/tmp/fake.ogg"), \
+             patch("app.transcribe_audio_file", return_value="bob smith approved the invoice"), \
+             patch("app.send_telegram_alert", return_value=True):
+            response = client.post("/webhook", json=payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(app.LEADS_DATABASE[1]["audio_note"], "bob smith approved the invoice")
+        self.assertEqual(app.LEADS_DATABASE[0]["audio_note"], "")
+        self.assertEqual(app.TELEGRAM_SENDER_TO_LEAD.get("42"), 1)
+
+    def test_webhook_bind_command_sets_sender_mapping(self):
+        app.LEADS_DATABASE.extend([
+            {"name": "Alice Carter", "company": "Northwind", "email": "alice@northwind.com", "audio_note": ""},
+            {"name": "Bob Smith", "company": "Acme Labs", "email": "bob@acme.com", "audio_note": ""},
+        ])
+
+        payload = {
+            "message": {
+                "text": "bind: Bob Smith",
+                "from": {"id": 99, "first_name": "Ops", "username": "opsuser"}
+            }
+        }
+
+        with app.app.test_client() as client, patch("app.send_telegram_alert", return_value=True):
+            response = client.post("/webhook", json=payload)
+
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["status"], "bound")
+        self.assertEqual(body["lead_index"], 1)
+        self.assertEqual(app.TELEGRAM_SENDER_TO_LEAD.get("99"), 1)
+
+    def test_webhook_unbind_command_clears_sender_mapping(self):
+        app.LEADS_DATABASE.append({"name": "Alice Carter", "company": "Northwind", "email": "alice@northwind.com", "audio_note": ""})
+        app.TELEGRAM_SENDER_TO_LEAD["99"] = 0
+
+        payload = {
+            "message": {
+                "text": "unbind",
+                "from": {"id": 99, "first_name": "Ops", "username": "opsuser"}
+            }
+        }
+
+        with app.app.test_client() as client, patch("app.send_telegram_alert", return_value=True):
+            response = client.post("/webhook", json=payload)
+
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["status"], "unbound")
+        self.assertNotIn("99", app.TELEGRAM_SENDER_TO_LEAD)
 
 
 if __name__ == "__main__":
