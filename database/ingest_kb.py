@@ -3,7 +3,7 @@ import sys
 
 # Ensure parent directory is accessible for standalone package execution
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from database.db_manager import get_connection
+from database.db_manager import get_connection, get_param_placeholder, DB_TYPE
 
 # Resolve dynamic paths depending on local vs cPanel execution environments
 BASE_DIR = "/home/vsmwrurd/repositories/AiEC-Bot" if os.path.exists("/home/vsmwrurd") else "."
@@ -19,23 +19,26 @@ def populate_kb():
         content = f.read().strip()
 
     entries = [block.strip() for block in content.split("\n\n") if block.strip()]
+    placeholder = get_param_placeholder()
 
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM knowledge_base;")
-        
+
         for entry in entries:
             lines = entry.split('\n')
             category = "General"
             keyword = lines[0][:50] if lines else "Info Block"
-            
-            cursor.execute("""
+
+            query = f"""
                 INSERT INTO knowledge_base (category, keyword, content)
-                VALUES (?, ?, ?)
-            """, (category, keyword, entry))
-            
+                VALUES ({placeholder}, {placeholder}, {placeholder})
+            """
+            cursor.execute(query, (category, keyword, entry))
+
         conn.commit()
-        print(f"[+] Ingested {len(entries)} data blocks cleanly into SQLite 'knowledge_base'.")
+        db_label = "PostgreSQL" if DB_TYPE == "postgres" else "SQLite"
+        print(f"[+] Ingested {len(entries)} data blocks cleanly into '{db_label}' knowledge_base.")
 
 if __name__ == "__main__":
     populate_kb()
