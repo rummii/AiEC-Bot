@@ -1,0 +1,44 @@
+# --- Version Control ---
+.git
+.gitignore
+
+# --- Python Cache ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+*.egg
+*.manifest
+*.spec
+
+# --- Virtual Environments ---
+venv/
+.venv/
+env/
+.env
+
+# --- Local Dev / Debug ---
+*.log
+runs/
+static/
+_out_*.txt
+_diff_*.txt
+_here.txt
+_inspect.ps1
+
+# --- Local Database ---
+aiec_bot.db
+
+# --- OS Files ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- Test Files ---
+tests/
+test_*.py
+*_test.py
+
+# --- Documentation (not needed in container) ---
+*.md
+!requirements.txt

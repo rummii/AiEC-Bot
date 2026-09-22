@@ -1,11 +1,30 @@
 #!/bin/bash
+# ============================================================
+# AiEC-Bot Launch Script
+# Tokens are provided via environment variables (GitHub Environment Secrets)
+# ============================================================
 
-echo "⚙️ Writing verified case-sensitive credentials to config.py..."
-cat << 'CONFIG' > config.py
-TELEGRAM_BOT_TOKEN = "8624026555:AAHZsOh95QmuqhoPOYuVhcfk0eIfJGH7P54"
-TELEGRAM_CHAT_ID = "6027602817"
-DEEPSEEK_API_KEY = "YOUR_DEEPSEEK_KEY_HERE"
-CONFIG
+# Ensure config.py uses env-var-based defaults
+if [ ! -f config.py ]; then
+    cat > config.py << 'EOF'
+# AiEC-Bot Configuration
+# Secrets are loaded from environment variables (e.g., GitHub Environment Secrets)
+# Set these as environment variables in your deployment (GitHub, cPanel, etc.)
+
+# Telegram Bot Token - set via environment variable TELEGRAM_BOT_TOKEN
+TELEGRAM_BOT_TOKEN = None
+
+# Telegram Chat ID - set via environment variable TELEGRAM_CHAT_ID
+TELEGRAM_CHAT_ID = None
+
+# DeepSeek API Key - set via environment variable DEEPSEEK_API_KEY
+DEEPSEEK_API_KEY = None
+
+# Telegram Webhook URL - set via environment variable TELEGRAM_WEBHOOK_URL
+TELEGRAM_WEBHOOK_URL = None
+EOF
+    echo "✅ Created config.py with env-var placeholder defaults"
+fi
 
 echo "🧹 Clearing lingering port 5000 processes..."
 fuser -k 5000/tcp || true
