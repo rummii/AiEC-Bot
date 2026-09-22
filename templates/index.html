@@ -185,9 +185,15 @@
             <div id="reader" class="video-box" style="display:none;"></div>
             <div id="cam-fallback" class="video-placeholder">
                 <span style="font-size: 24px; margin-bottom: 5px;">📷</span>
-                <span>Camera Stream Inactive</span>
+                <span id="cam-fallback-text">Camera Stream Inactive</span>
             </div>
             <button id="btn-camera">Activate QR Scanner</button>
+
+            <div id="qr-manual-panel" style="display:none; margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                <label>No camera available? Paste the QR payload manually</label>
+                <input type="text" id="qr-manual-input" placeholder="Paste raw QR / vCard payload" autocomplete="off">
+                <button id="btn-qr-manual" type="button">Submit QR Payload</button>
+            </div>
         </div>
 
         <div class="card">
@@ -306,6 +312,45 @@
             setStatus(`Context tracking redirected to: ${target.name.toUpperCase()}`, 'success');
         }
 
+        function describeCameraError(err) {
+            const name = (err && err.name) || '';
+            const detail = (err && err.message) || String(err);
+            switch (name) {
+                case 'NotFoundError':
+                case 'DevicesNotFoundError':
+                    return 'No camera detected on this device. Use Manual Lead Override, or paste the QR payload below.';
+                case 'NotAllowedError':
+                case 'PermissionDeniedError':
+                    return 'Camera permission was blocked. Allow camera access for this site, then retry.';
+                case 'NotReadableError':
+                case 'TrackStartError':
+                    return 'The camera is already in use by another application. Close it and retry.';
+                case 'OverconstrainedError':
+                    return 'No camera matched the requested rear-facing mode. Retry, or paste the QR payload below.';
+                case 'SecurityError':
+                    return 'Camera access requires a secure (HTTPS) connection.';
+                default:
+                    return `Camera unavailable: ${detail}. Use Manual Lead Override, or paste the QR payload below.`;
+            }
+        }
+
+        function showCameraFallback(fallbackMessage) {
+            const reader = document.getElementById('reader');
+            const fallback = document.getElementById('cam-fallback');
+            const preview = document.getElementById('preview-video');
+            const manualPanel = document.getElementById('qr-manual-panel');
+
+            if (preview) preview.style.display = 'none';
+            if (reader) reader.style.display = 'none';
+            if (fallback) {
+                fallback.style.display = 'flex';
+                const text = document.getElementById('cam-fallback-text');
+                if (text) text.textContent = fallbackMessage;
+            }
+            // Reveal the manual QR path so scanning still works without camera hardware.
+            if (manualPanel) manualPanel.style.display = 'block';
+        }
+
         async function startCamera() {
             if (!window.Html5Qrcode) {
                 setStatus('QR decoder library unavailable: HTML5 QR Code component failed to load.', 'error');
@@ -315,6 +360,29 @@
             const reader = document.getElementById('reader');
             const fallback = document.getElementById('cam-fallback');
             const preview = document.getElementById('preview-video');
+
+            // Preflight 1: camera APIs require a secure context (HTTPS or localhost).
+            if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+                const msg = 'Camera API unavailable — this page must be served over HTTPS.';
+                showCameraFallback(msg);
+                setStatus(msg + ' Use Manual Lead Override, or paste the QR payload below.', 'error');
+                return;
+            }
+
+            // Preflight 2: confirm a camera is actually attached before starting a stream.
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const hasCamera = devices.some(device => device.kind === 'videoinput');
+                if (!hasCamera) {
+                    const msg = 'No camera detected on this device.';
+                    showCameraFallback(msg);
+                    setStatus(msg + ' Use Manual Lead Override, or paste the QR payload below.', 'error');
+                    return;
+                }
+            } catch (enumErr) {
+                // Some browsers restrict enumerateDevices before permission is granted.
+                console.warn('enumerateDevices preflight failed:', enumErr);
+            }
 
             try {
                 preview.style.display = 'none';
@@ -339,10 +407,9 @@
                     }
                 );
             } catch (err) {
-                preview.style.display = 'none';
-                reader.style.display = 'none';
-                fallback.style.display = 'block';
-                setStatus(`Hardware activation failure: ${err.message || err}`, 'error');
+                const friendly = describeCameraError(err);
+                showCameraFallback(friendly);
+                setStatus(friendly, 'error');
             }
         }
 
@@ -439,6 +506,18 @@
             document.getElementById('btn-camera').addEventListener('click', startCamera);
             document.getElementById('btn-save').addEventListener('click', saveLead);
             document.getElementById('btn-audio').addEventListener('click', processAudio);
+
+            document.getElementById('btn-qr-manual').addEventListener('click', () => {
+                const input = document.getElementById('qr-manual-input');
+                const payload = (input.value || '').trim();
+                if (!payload) {
+                    setStatus('Validation Error: paste a QR payload before submitting.', 'error');
+                    return;
+                }
+                setStatus('QR payload submitted manually.', 'success');
+                processQRData(payload);
+                input.value = '';
+            });
         });
     </script>
 </body>
