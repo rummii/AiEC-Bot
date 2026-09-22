@@ -2,7 +2,7 @@ import os
 import re
 import uuid
 import requests
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, Response
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -288,6 +288,24 @@ def parse_vcard(vcard_text):
 @app.route('/', methods=['GET'])
 def index_dashboard():
     return render_template('index.html')
+
+FAVICON_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+    '<rect width="64" height="64" rx="14" fill="#1e6091"/>'
+    '<text x="32" y="45" font-family="Arial, Helvetica, sans-serif" '
+    'font-size="34" font-weight="700" text-anchor="middle" fill="#ffffff">A</text>'
+    '</svg>'
+)
+
+
+@app.route('/favicon.ico', methods=['GET'])
+def favicon():
+    """Serve an inline SVG favicon so browsers stop logging a 404."""
+    return Response(
+        FAVICON_SVG,
+        mimetype='image/svg+xml',
+        headers={'Cache-Control': 'public, max-age=86400'},
+    )
 
 @app.route('/webhook-status', methods=['GET'])
 def webhook_status():
