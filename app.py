@@ -1,3 +1,4 @@
+import hmac
 import os
 import re
 import uuid
@@ -63,6 +64,7 @@ TELEGRAM_BOT_TOKEN = get_setting("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = get_setting("TELEGRAM_CHAT_ID")
 DEEPSEEK_API_KEY = get_setting("DEEPSEEK_API_KEY")
 TELEGRAM_WEBHOOK_URL = get_setting("TELEGRAM_WEBHOOK_URL") or get_setting("PUBLIC_WEBHOOK_URL") or get_setting("WEBHOOK_PUBLIC_URL") or get_setting("TUNNEL_URL")
+TELEGRAM_WEBHOOK_SECRET = get_setting("TELEGRAM_WEBHOOK_SECRET")
 
 app = Flask(__name__, template_folder='templates')
 CORS(app)
@@ -245,6 +247,33 @@ def _normalize_webhook_url(base_url):
     return f"{base_url.rstrip('/')}/webhook"
 
 
+def webhook_secret_configured():
+    """Return True when a Telegram webhook secret token is configured."""
+    return not is_placeholder_setting(TELEGRAM_WEBHOOK_SECRET)
+
+
+def verify_telegram_webhook_request(req):
+    """Validate the ``X-Telegram-Bot-Api-Secret-Token`` header.
+
+    Returns True when the request may be processed. When no secret is configured
+    the request is allowed for backwards compatibility, but a warning is logged
+    because the endpoint is then open to spoofed updates.
+    """
+    expected = _normalize_setting_value(TELEGRAM_WEBHOOK_SECRET)
+    if is_placeholder_setting(expected):
+        logger.warning(
+            "[SECURITY] TELEGRAM_WEBHOOK_SECRET is not set - "
+            "incoming webhook requests are NOT authenticated."
+        )
+        return True
+
+    provided = _normalize_setting_value(req.headers.get("X-Telegram-Bot-Api-Secret-Token"))
+    if not provided:
+        return False
+
+    return hmac.compare_digest(provided, expected)
+
+
 def register_telegram_webhook():
     token = _normalize_setting_value(TELEGRAM_BOT_TOKEN)
     webhook_url = _normalize_webhook_url(TELEGRAM_WEBHOOK_URL)
@@ -257,11 +286,21 @@ def register_telegram_webhook():
             logger.warning(f"[TELEGRAM] - Webhook URL: {webhook_url}")
         return False
 
+    secret = _normalize_setting_value(TELEGRAM_WEBHOOK_SECRET)
+    payload = {
+        "url": webhook_url,
+        "drop_pending_updates": False,
+        "allowed_updates": ["message"],
+    }
+    if not is_placeholder_setting(secret):
+        payload["secret_token"] = secret
+
     try:
         logger.info(f"[TELEGRAM] 🔗 Registering webhook: {webhook_url}")
+        logger.info(f"[TELEGRAM] 🔐 Secret token enforced: {not is_placeholder_setting(secret)}")
         response = requests.post(
             f"https://api.telegram.org/bot{token}/setWebhook",
-            json={"url": webhook_url, "drop_pending_updates": False, "allowed_updates": ["message"]},
+            json=payload,
             timeout=10,
         )
         result = response.json()
@@ -317,6 +356,7 @@ def webhook_status():
         "webhook_configured": not is_placeholder_setting(token) and not is_placeholder_setting(webhook_url),
         "token_configured": not is_placeholder_setting(token),
         "webhook_url_configured": not is_placeholder_setting(webhook_url),
+        "webhook_secret_configured": webhook_secret_configured(),
         "webhook_url": webhook_url if not is_placeholder_setting(webhook_url) else "NOT SET",
         "help": "If webhook_configured is false, voice messages won't be received. Set TELEGRAM_BOT_TOKEN and TELEGRAM_WEBHOOK_URL in config.py or environment variables."
     }
@@ -598,6 +638,10 @@ register_telegram_webhook()
 
 @app.route('/webhook', methods=['POST'])
 def handle_webhook():
+    if not verify_telegram_webhook_request(request):
+        logger.warning("[SECURITY] Rejected webhook request: missing or invalid secret token.")
+        return jsonify({"status": "forbidden", "reason": "invalid secret token"}), 403
+
     data = request.get_json(force=True, silent=True) or {}
     if not data or "message" not in data:
         return jsonify({"status": "ignored", "reason": "no message"}), 200

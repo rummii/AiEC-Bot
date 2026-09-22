@@ -103,6 +103,33 @@ gcloud run services update aiec-bot \
 | `TELEGRAM_CHAT_ID` | Bot → @userinfobot | `123456789` |
 | `DEEPSEEK_API_KEY` | console.deepseek.com | `sk-abcdef...` |
 | `TELEGRAM_WEBHOOK_URL` | Auto-set after deploy | `https://aiec-bot-xxx-uc.a.run.app` |
+| `TELEGRAM_WEBHOOK_SECRET` | Self-generated (recommended) | `secrets.token_urlsafe(32)` |
+
+### Webhook Authentication (recommended)
+
+Generate a secret and store it in Secret Manager, then mount it:
+
+```bash
+# Generate
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+
+# Store
+printf '%s' 'YOUR_GENERATED_SECRET' | \
+  gcloud secrets create aiec-telegram-webhook-secret --data-file=- --replication-policy=automatic
+
+# Grant access
+gcloud secrets add-iam-policy-binding aiec-telegram-webhook-secret \
+  --member="serviceAccount:YOUR_PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+
+# Mount
+gcloud run services update aiec-bot --region us-central1 \
+  --update-secrets="TELEGRAM_WEBHOOK_SECRET=aiec-telegram-webhook-secret:latest"
+```
+
+When set, `/webhook` returns **HTTP 403** for any request whose
+`X-Telegram-Bot-Api-Secret-Token` header is missing or does not match, and the app
+passes the same value to `setWebhook` automatically at startup.
 
 ### Get Your Webhook URL
 
