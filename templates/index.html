@@ -8,22 +8,23 @@
     <link rel="apple-touch-icon" href="/favicon.ico">
     <style>
         :root {
-            /* ---- Space-age palette: pure white base, deep indigo, cyan glow ---- */
-            --primary: #4338ca;
-            --primary-hover: #3730a3;
-            --accent: #06b6d4;
+            /* ---- Monochrome palette: black, white and grays only ---- */
+            --primary: #0a0a0a;
+            --primary-hover: #262626;
+            --accent: #525252;
+            --ink: #0a0a0a;
             --bg: #ffffff;
-            --surface-alt: #f8fafc;
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-            --border-color: #e2e8f0;
-            --border-strong: #cbd5e1;
-            --success: #0d9488;
-            --warning: #b45309;
-            --danger: #dc2626;
-            --ring: rgba(67, 56, 202, 0.16);
-            --shadow-sm: 0 1px 2px rgba(15,23,42,.04), 0 1px 3px rgba(15,23,42,.05);
-            --shadow-md: 0 6px 16px rgba(15,23,42,.06), 0 18px 40px rgba(15,23,42,.05);
+            --surface-alt: #fafafa;
+            --text-main: #0a0a0a;
+            --text-muted: #737373;
+            --border-color: #e5e5e5;
+            --border-strong: #d4d4d4;
+            --success: #171717;
+            --warning: #525252;
+            --danger: #0a0a0a;
+            --ring: rgba(0, 0, 0, 0.10);
+            --shadow-sm: 0 1px 2px rgba(0,0,0,.04), 0 1px 3px rgba(0,0,0,.06);
+            --shadow-md: 0 6px 16px rgba(0,0,0,.07), 0 18px 40px rgba(0,0,0,.06);
             --radius: 16px;
             --radius-sm: 10px;
             --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -34,11 +35,11 @@
 
         body {
             background-color: var(--bg);
-            /* Orbital glow + star-field grid: the "space-age" signature */
+            /* Monochrome orbital glow + star-field grid: the "space-age" signature */
             background-image:
-                radial-gradient(1100px 520px at 50% -12%, rgba(67,56,202,.07), transparent 62%),
-                radial-gradient(760px 380px at 102% -4%, rgba(6,182,212,.06), transparent 58%),
-                radial-gradient(rgba(15,23,42,.045) 1px, transparent 1px);
+                radial-gradient(1100px 520px at 50% -12%, rgba(0,0,0,.035), transparent 62%),
+                radial-gradient(760px 380px at 102% -4%, rgba(0,0,0,.028), transparent 58%),
+                radial-gradient(rgba(0,0,0,.05) 1px, transparent 1px);
             background-size: auto, auto, 22px 22px;
             background-repeat: no-repeat, no-repeat, repeat;
             background-attachment: fixed;
@@ -74,13 +75,13 @@
             align-items: center;
             gap: 10px;
         }
-        /* Orbital brand mark */
+        /* Orbital brand mark (monochrome) */
         .header-bar h2::before {
             content: "";
             width: 9px; height: 9px;
             border-radius: 50%;
-            background: var(--primary);
-            box-shadow: 0 0 0 3px rgba(67,56,202,.14), 0 0 12px rgba(67,56,202,.45);
+            background: var(--ink);
+            box-shadow: 0 0 0 3px rgba(0,0,0,.08), 0 0 12px rgba(0,0,0,.20);
             flex: 0 0 auto;
         }
         .hub-chip {
@@ -89,17 +90,17 @@
             font-size: 10px;
             letter-spacing: .12em;
             text-transform: uppercase;
-            background: rgba(67,56,202,.08);
-            color: var(--primary);
+            background: #f5f5f5;
+            color: var(--text-main);
             padding: 4px 10px;
             border-radius: 999px;
-            border: 1px solid rgba(67,56,202,.16);
+            border: 1px solid var(--border-color);
         }
         .status-badge {
             font-family: var(--font-mono);
             font-size: 10px;
             letter-spacing: .14em;
-            color: var(--success);
+            color: var(--text-main);
             font-weight: 600;
             text-transform: uppercase;
             white-space: nowrap;
@@ -107,20 +108,20 @@
             align-items: center;
             gap: 7px;
             padding: 6px 12px;
-            border: 1px solid rgba(13,148,136,.28);
-            background: rgba(13,148,136,.06);
+            border: 1px solid var(--border-strong);
+            background: #ffffff;
             border-radius: 999px;
         }
         .status-badge::before {
             content: "";
             width: 6px; height: 6px;
             border-radius: 50%;
-            background: var(--success);
+            background: var(--ink);
             animation: pulse 2.4s ease-in-out infinite;
         }
         @keyframes pulse {
             0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: .45; transform: scale(.8); }
+            50% { opacity: .35; transform: scale(.8); }
         }
         @media (prefers-reduced-motion: reduce) {
             .status-badge::before { animation: none; }
@@ -132,25 +133,28 @@
             padding: 14px 18px;
             background: var(--surface-alt);
             border: 1px solid var(--border-color);
-            border-left: 3px solid var(--primary);
-            color: var(--text-main);
+            border-left: 3px solid var(--border-strong);
+            color: var(--text-muted);
             border-radius: var(--radius-sm);
             font-size: 13px;
             font-weight: 500;
             box-shadow: var(--shadow-sm);
             transition: background .25s ease, border-color .25s ease, color .25s ease;
         }
+        /* Monochrome alert: inverted block signals an error state */
         .status-alert.error {
-            background: rgba(220,38,38,.045);
-            border-color: rgba(220,38,38,.22);
-            border-left-color: var(--danger);
-            color: #991b1b;
+            background: var(--ink);
+            border-color: var(--ink);
+            border-left-color: var(--ink);
+            color: #ffffff;
         }
+        /* Monochrome confirmation: solid black accent bar */
         .status-alert.success {
-            background: rgba(13,148,136,.05);
-            border-color: rgba(13,148,136,.22);
-            border-left-color: var(--success);
-            color: #0f766e;
+            background: #ffffff;
+            border-color: var(--border-strong);
+            border-left-color: var(--ink);
+            color: var(--ink);
+            font-weight: 600;
         }
 
         .main-container {
@@ -189,6 +193,14 @@
             padding-bottom: 12px;
             border-bottom: 1px solid var(--border-color);
         }
+        /* Monochrome diamond index marker (replaces the coloured emoji) */
+        .card-title::before {
+            content: "";
+            width: 6px; height: 6px;
+            background: var(--ink);
+            flex: 0 0 auto;
+            transform: rotate(45deg);
+        }
 
         label {
             display: block;
@@ -213,16 +225,16 @@
             border-radius: var(--radius-sm);
             transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
         }
-        input::placeholder { color: #94a3b8; }
+        input::placeholder { color: #a3a3a3; }
         input[type="text"]:focus, input[type="email"]:focus, input[type="file"]:focus {
             background: #ffffff;
-            border-color: var(--primary);
+            border-color: var(--ink);
             box-shadow: 0 0 0 3px var(--ring);
         }
 
         button {
-            background: linear-gradient(135deg, var(--primary) 0%, #5b21b6 100%);
-            border: 1px solid transparent;
+            background: var(--ink);
+            border: 1px solid var(--ink);
             color: #ffffff;
             padding: 13px 18px;
             cursor: pointer;
@@ -231,45 +243,47 @@
             letter-spacing: .02em;
             width: 100%;
             border-radius: var(--radius-sm);
-            transition: box-shadow .22s ease, transform .22s ease, filter .22s ease;
-            box-shadow: 0 1px 2px rgba(67,56,202,.25), 0 6px 18px rgba(67,56,202,.18);
+            transition: background .22s ease, box-shadow .22s ease, transform .22s ease;
+            box-shadow: 0 1px 2px rgba(0,0,0,.16), 0 6px 18px rgba(0,0,0,.10);
         }
         button:hover {
-            filter: brightness(1.06);
-            box-shadow: 0 2px 4px rgba(67,56,202,.3), 0 10px 26px rgba(67,56,202,.24);
+            background: var(--primary-hover);
+            border-color: var(--primary-hover);
+            box-shadow: 0 2px 4px rgba(0,0,0,.20), 0 10px 26px rgba(0,0,0,.14);
             transform: translateY(-1px);
         }
         button:active { transform: translateY(0) scale(.995); }
-        button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+        button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
         /* Minimal ghost variant for the manual QR fallback */
         #btn-qr-manual {
             background: #ffffff;
-            color: var(--primary);
-            border: 1px solid rgba(67,56,202,.28);
+            color: var(--ink);
+            border: 1px solid var(--border-strong);
             box-shadow: none;
         }
         #btn-qr-manual:hover {
-            background: rgba(67,56,202,.05);
-            filter: none;
+            background: #f5f5f5;
+            border-color: var(--ink);
             box-shadow: none;
+            transform: none;
         }
         
-        /* Camera viewport: a dark "screen" reads as hi-tech against the white canvas */
+        /* Camera viewport: monochrome black screen against the white canvas */
         .video-box {
             width: 100%;
-            background: #0b1120;
+            background: #000000;
             border-radius: var(--radius-sm);
             aspect-ratio: 16/9;
             object-fit: cover;
             margin-bottom: 16px;
-            border: 1px solid #1e293b;
-            box-shadow: inset 0 0 0 1px rgba(6,182,212,.08);
+            border: 1px solid #171717;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
         }
         .video-placeholder {
             width: 100%;
             background-color: var(--surface-alt);
-            background-image: radial-gradient(rgba(67,56,202,.07) 1px, transparent 1px);
+            background-image: radial-gradient(rgba(0,0,0,.07) 1px, transparent 1px);
             background-size: 16px 16px;
             color: var(--text-muted);
             height: 180px;
@@ -284,6 +298,23 @@
             border-radius: var(--radius-sm);
             margin-bottom: 16px;
             border: 1px dashed var(--border-strong);
+        }
+        /* Monochrome placeholder mark (replaces the camera emoji) */
+        .placeholder-mark {
+            width: 26px; height: 20px;
+            border: 1.5px solid var(--border-strong);
+            border-radius: 4px;
+            position: relative;
+            margin-bottom: 8px;
+        }
+        .placeholder-mark::after {
+            content: "";
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 8px; height: 8px;
+            border: 1.5px solid var(--border-strong);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
         }
 
         .anchor-box {
@@ -300,10 +331,11 @@
         }
         /* Locked-on state (toggled by selectAnchor) */
         .anchor-box-active {
-            background: rgba(67,56,202,.06);
-            border-color: rgba(67,56,202,.22);
-            border-left-color: var(--primary);
-            color: var(--primary);
+            background: #f5f5f5;
+            border-color: var(--border-strong);
+            border-left-color: var(--ink);
+            color: var(--ink);
+            font-weight: 600;
         }
 
         .table-wrap { overflow-x: auto; margin-top: 5px; border-radius: var(--radius-sm); }
@@ -323,16 +355,16 @@
 
         tr.lead-row { cursor: pointer; transition: background .18s ease; }
         tr.lead-row:hover { background: var(--surface-alt); }
-        tr.active-anchor { background: rgba(67,56,202,.07) !important; }
-        tr.active-anchor td { color: var(--primary); font-weight: 500; }
+        tr.active-anchor { background: #f0f0f0 !important; }
+        tr.active-anchor td { color: var(--ink); font-weight: 600; }
 
         .audio-badge {
             font-family: var(--font-mono);
             font-size: 10px;
             letter-spacing: .02em;
-            background: rgba(67,56,202,.08);
-            color: var(--primary);
-            border: 1px solid rgba(67,56,202,.14);
+            background: #f5f5f5;
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
             padding: 4px 8px;
             border-radius: 999px;
             display: inline-block;
@@ -358,7 +390,7 @@
 
     <div class="header-bar">
         <h2>AiEC-Bot <span class="hub-chip">Executive Hub</span></h2>
-        <div class="status-badge">● Workspace Active</div>
+        <div class="status-badge">Workspace Active</div>
     </div>
 
     <div id="status-banner" class="status-alert">System Ready. Awaiting QR code initialization or manual lead override.</div>
@@ -366,11 +398,11 @@
     <div class="main-container">
         
         <div class="card">
-            <div class="card-title">📷 Scan Client QR Code</div>
+            <div class="card-title">Scan Client QR Code</div>
             <video id="preview-video" class="video-box" autoplay playsinline style="display:none;"></video>
             <div id="reader" class="video-box" style="display:none;"></div>
             <div id="cam-fallback" class="video-placeholder">
-                <span style="font-size: 24px; margin-bottom: 5px;">📷</span>
+                <span class="placeholder-mark" aria-hidden="true"></span>
                 <span id="cam-fallback-text">Camera Stream Inactive</span>
             </div>
             <button id="btn-camera">Activate QR Scanner</button>
@@ -383,7 +415,7 @@
         </div>
 
         <div class="card">
-            <div class="card-title">✍️ Manual Lead Override</div>
+            <div class="card-title">Manual Lead Override</div>
             <form id="manual-form" onsubmit="event.preventDefault();">
                 <label>Lead Name</label>
                 <input type="text" id="manual-name" placeholder="John Doe" autocomplete="off">
@@ -399,9 +431,9 @@
         </div>
 
         <div class="card">
-            <div class="card-title">🎙️ Interaction Voice Logger</div>
+            <div class="card-title">Interaction Voice Logger</div>
             <div id="anchor-status" class="anchor-box">
-                ⚠️ No active interaction context chosen. Tap a row in the matrix registry below to attach voice metadata.
+                No active interaction context chosen. Tap a row in the matrix registry below to attach voice metadata.
             </div>
             <label>Upload Audio Interaction (.m4a, .mp3, .wav)</label>
             <input type="file" id="audio-file" accept="audio/*, .m4a, .mp4, .mov, .3gp, .mp3, .wav">
@@ -409,7 +441,7 @@
         </div>
 
         <div class="card">
-            <div class="card-title">📊 Active Record Matrix</div>
+            <div class="card-title">Active Record Matrix</div>
             <div class="table-wrap">
                 <table>
                     <thead>
@@ -458,7 +490,7 @@
                     tr.classList.add('active-anchor');
                 }
                 
-                const audioBadge = lead.audio_note ? `<div class="audio-badge">🎙️ Notes: ${lead.audio_note}</div>` : '';
+                const audioBadge = lead.audio_note ? `<div class="audio-badge">Notes: ${lead.audio_note}</div>` : '';
                 
                 tr.innerHTML = `
                     <td>${lead.timestamp || '--'}</td>
@@ -490,7 +522,7 @@
             const statusBox = document.getElementById('anchor-status');
             
             statusBox.classList.add('anchor-box-active');
-            statusBox.textContent = `🎯 Context Locked onto Profile: ${target.name.toUpperCase()} (${target.company.toUpperCase()})`;
+            statusBox.textContent = `Context Locked onto Profile: ${target.name.toUpperCase()} (${target.company.toUpperCase()})`;
             
             updateTable(localLeadsCache);
             setStatus(`Context tracking redirected to: ${target.name.toUpperCase()}`, 'success');
@@ -677,7 +709,7 @@
                         selectedLeadIndex = null;
                         const anchorBox = document.getElementById('anchor-status');
                         anchorBox.classList.remove('anchor-box-active');
-                        anchorBox.textContent = '⚠️ No active interaction context chosen. Tap a row in the matrix registry below to attach voice metadata.';
+                        anchorBox.textContent = 'No active interaction context chosen. Tap a row in the matrix registry below to attach voice metadata.';
                         updateTable(localLeadsCache);
                     }
                 } else {
